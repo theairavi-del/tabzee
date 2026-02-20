@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>TABZEE v3 - Split Bills Instantly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src='https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-light: #1f1f1f;
+            --border: #2a2a2a;
+            --primary: #FF6B00;
+            --success: #22c55e;
+            --warning: #facc15;
+            --error: #dc2626;
+            --text: #ffffff;
+            --text-secondary: #a1a1a1;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+        .screen { display: none; min-height: 100vh; animation: slideIn 0.3s ease; }
+        .screen.active { display: flex; flex-direction: column; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); } 50% { box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 5px rgba(250, 204, 21, 0.2); } 50% { box-shadow: 0 0 15px rgba(250, 204, 21, 0.4); } }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        .btn { min-height: 60px; padding: 0 32px; border-radius: 14px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: black; }
+        .btn-warning { background: var(--yellow); color: black; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
+        .input { width: 100%; min-height: 60px; padding: 16px 20px; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; color: var(--text); font-size: 18px; margin-bottom: 12px; }
+        .input:focus { outline: none; border-color: var(--primary); }
+        .card { background: var(--surface); border: 2px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 12px; }
+        .emoji-bounce { animation: bounce 1.5s infinite; }
+        .pulse-ring { animation: pulse 2s infinite; }
+        .orphan-glow { animation: glow 2s infinite; border-color: var(--yellow) !important; }
+        .nav { position: fixed; top: 0; left: 0; right: 0; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); backdrop-filter: blur(10px); z-index: 100; border-bottom: 1px solid var(--border); }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--surface); border: 2px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 400px; }
+        .pin-input { width: 50px; height: 60px; text-align: center; font-size: 24px; font-weight: 900; padding: 0; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; color: var(--text); }
+        .progress-bar { width: 100%; height: 8px; background: var(--surface-light); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width 0.3s ease; }
+        .avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; }
+        .avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--surface-light); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 3px solid var(--border); animation: popIn 0.3s ease; }
+        .avatar.me { border-color: var(--primary); animation: popIn 0.3s ease, pulse 2s infinite; }
+        .claimant-tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--surface-light); border-radius: 20px; font-size: 13px; margin: 4px; }
+        .item-card { background: var(--surface); border: 2px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .item-card.unclaimed { border-color: var(--warning); animation: glow 2s infinite; }
+        .hidden { display: none !important; }
+        
+        /* TABZEE Logo */
+        .logo {
+            font-weight: 900;
+            font-size: 1.75rem;
+            letter-spacing: -1px;
+            color: var(--text);
+        }
+        .logo span {
+            color: var(--primary);
+        }
+        
+        /* Custom Confirmation Modal */
+        .confirm-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 2000;
+        }
+        .confirm-modal.active {
+            display: flex;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .confirm-content {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            width: 100%;
+            max-width: 340px;
+            text-align: center;
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .confirm-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .confirm-message {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .confirm-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .confirm-btn {
+            flex: 1;
+            min-height: 48px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .confirm-btn:active {
+            transform: scale(0.97);
+        }
+        .confirm-btn-cancel {
+            background: transparent;
+            border: 2px solid var(--border);
+            color: var(--text);
+        }
+        .confirm-btn-confirm {
+            background: var(--error);
+            color: white;
+        }
+        
+        /* Avatar with X button for host */
+        .avatar-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .avatar-remove {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 28px;
+            height: 28px;
+            background: var(--error);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            border: 3px solid var(--surface);
+            transition: all 0.15s;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .avatar-remove:hover {
+            transform: scale(1.15);
+            background: #dc2626;
+        }
+        .avatar-remove:active {
+            transform: scale(0.9);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav" id="nav" style="display: none;">
+        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen">TABZ<span>EE</span></div>
+        <div class="font-mono text-sm px-4 py-2 rounded-lg" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay"></div>
+    </nav>
+
+    <!-- Screen 1: Welcome -->
+    <div class="screen active" id="welcomeScreen">
+        <!-- BUG 10 FIX: Logo always visible and clickable on welcome screen too -->
+        <div class="absolute top-0 left-0 right-0 p-4 text-center">
+            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="TABZEE - Click to refresh">TABZ<span>EE</span></div>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
+            <h1 class="text-4xl font-black mb-3">Split bills<br><span style="color: var(--primary);">in seconds</span></h1>
+            <p class="text-lg mb-8" style="color: var(--text-secondary);">No accounts. No downloads.<br>Just scan, claim, and pay.</p>
+            <div class="w-full max-w-sm space-y-4">
+                <button class="btn btn-primary w-full text-xl" onclick="createRoom()">New Split</button>
+                <button class="btn btn-outline w-full" onclick="showJoin()">Join Split</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 2: Join Modal -->
+    <div class="modal" id="joinModal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Enter Room Code</h3>
+            <div class="flex gap-2 justify-center mb-6">
+                <input type="text" class="pin-input" id="p1" maxlength="1" onkeydown="handlePinKey(event, 1)" oninput="nextPin(1)">
+                <input type="text" class="pin-input" id="p2" maxlength="1" onkeydown="handlePinKey(event, 2)" oninput="nextPin(2)">
+                <input type="text" class="pin-input" id="p3" maxlength="1" onkeydown="handlePinKey(event, 3)" oninput="nextPin(3)">
+                <input type="text" class="pin-input" id="p4" maxlength="1" onkeydown="handlePinKey(event, 4)" oninput="nextPin(4)">
+                <input type="text" class="pin-input" id="p5" maxlength="1" onkeydown="handlePinKey(event, 5)" oninput="nextPin(5)">
+                <input type="text" class="pin-input" id="p6" maxlength="1" onkeydown="handlePinKey(event, 6)" oninput="joinRoom()">
+            </div>
+            <div class="flex gap-3">
+                <button class="btn btn-outline flex-1" onclick="hideJoin()">Cancel</button>
+                <button class="btn btn-primary flex-1" onclick="joinRoom()">Join</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 3: Name/Avatar -->
+    <div class="modal" id="nameModal">
+        <div class="modal-content">
+            <button onclick="backToWelcome()" class="text-sm mb-4" style="color: var(--text-secondary); background: none; border: none; cursor: pointer;">[Back] Back</button>
+            <h3 class="text-xl font-bold mb-4">Who are you?</h3>
+            <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
+            <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
+            <button class="btn btn-primary w-full" onclick="setUser()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Add Missing Item Modal -->
+    <div class="modal" id="addItemModal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Add Missing Item</h3>
+            <input type="text" class="input mb-3" id="newItemName" placeholder="Item name (e.g., Chicken Wings)">
+            <input type="number" class="input mb-3" id="newItemPrice" placeholder="Price (e.g., 12.99)" step="0.01" min="0">
+            <input type="number" class="input mb-4" id="newItemQty" placeholder="Quantity" value="1" min="1">
+            <div class="flex gap-3">
+                <button class="btn btn-outline flex-1" onclick="hideAddItemModal()">Cancel</button>
+                <button class="btn btn-success flex-1" onclick="addMissingItem()">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Modal -->
+    <div class="confirm-modal" id="confirmModal">
+        <div class="confirm-content">
+            <div class="confirm-title" id="confirmTitle">Confirm</div>
+            <div class="confirm-message" id="confirmMessage">Are you sure?</div>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-btn-cancel" onclick="hideConfirmModal()">Cancel</button>
+                <button class="confirm-btn confirm-btn-confirm" onclick="confirmModalYes()">Leave</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 4: Lobby -->
+    <div class="screen" id="lobbyScreen">
+        <div class="pt-20 px-6">
+            <div class="text-center mb-6">
+                <div class="text-sm mb-2" style="color: var(--text-secondary);">ROOM CODE</div>
+                <div class="text-5xl font-black font-mono tracking-widest mb-4" id="lobbyCode" style="color: var(--warning);"></div>
+                <div class="text-sm" style="color: var(--text-secondary);">Share this code with friends</div>
+            </div>
+            <div class="card mb-6">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">Who's here:</div>
+                <div class="avatar-grid" id="playerList"></div>
+            </div>
+            <!-- Payment Methods (Host Only) -->
+            <div class="card mb-6" id="paymentSection" style="display: none;">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">Your Payment Links:</div>
+                <div class="space-y-3">
+                    <input type="text" class="input" id="venmoLink" placeholder="Venmo: @username" onchange="savePaymentMethods()">
+                    <input type="text" class="input" id="cashappLink" placeholder="Cash App: $username" onchange="savePaymentMethods()">
+                    <input type="text" class="input" id="paypalLink" placeholder="PayPal: paypal.me/username" onchange="savePaymentMethods()">
+                    <input type="text" class="input" id="applePayLink" placeholder="Apple Pay: Phone or Email" onchange="savePaymentMethods()">
+                </div>
+                <div class="text-xs mt-2" style="color: var(--text-secondary);">Friends will see these when it's time to pay</div>
+            </div>
+
+            <div class="space-y-3">
+                <button class="btn btn-success w-full" id="startBtn" onclick="goToReceipt()" style="display: none;">Start Splitting</button>
+                <button class="btn btn-outline w-full" onclick="shareRoom()">Share Link</button>
+                <button class="btn btn-outline w-full" onclick="leaveRoom()">Leave Room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 5: Receipt -->
+    <div class="screen" id="receiptScreen">
+        <div class="pt-20 px-6 flex-1 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4">Add Receipt</h2>
+            <div class="flex gap-2 mb-4">
+                <button class="btn btn-sm flex-1 text-sm py-2" onclick="setTab('camera')" id="tab-camera" style="min-height: 44px; background: var(--primary);">Camera</button>
+                <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('paste')" id="tab-paste" style="min-height: 44px;">Paste</button>
+                <button class="btn btn-outline flex-1 text-sm py-2" onclick="setTab('manual')" id="tab-manual" style="min-height: 44px;">Manual</button>
+            </div>
+            
+            <!-- Camera Tab -->
+            <div id="cameraSection" class="flex-1 flex flex-col">
+                <input type="file" id="receiptImage" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+                <input type="file" id="galleryImage" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                <div id="cameraPreview" class="hidden flex-1 flex flex-col">
+                    <img id="previewImg" class="w-full max-h-64 object-contain rounded-xl mb-4 bg-black">
+                    <div id="scanningOverlay" class="hidden relative">
+                        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-green-500/20 to-transparent h-8 animate-pulse"></div>
+                        <div class="text-center text-green-400 font-bold">Scanning receipt...</div>
+                    </div>
+                    <!-- Rescan buttons -->
+                    <div id="rescanButtons" class="hidden flex gap-3 mt-2">
+                        <button class="btn btn-outline flex-1" onclick="rescanReceipt()" style="min-height: 44px; font-size: 14px;">Retake Photo</button>
+                        <button class="btn btn-outline flex-1" onclick="rescanGallery()" style="min-height: 44px; font-size: 14px;">Choose Different</button>
+                    </div>
+                </div>
+                <div id="cameraButtons" class="flex-1 flex flex-col justify-center gap-4">
+                    <div id="ocrLoading" class="hidden text-center mb-4">
+                        <div class="text-yellow-400 font-bold mb-2">Loading OCR engine...</div>
+                        <div class="text-sm" style="color: var(--text-secondary);">First time only (2-3MB)</div>
+                    </div>
+                    <button class="btn btn-primary w-full" onclick="triggerCamera()">
+                        Take Photo
+                    </button>
+                    <button class="btn btn-outline w-full" onclick="triggerGallery()">
+                        Choose from Gallery
+                    </button>
+                    <div class="text-center text-xs mt-4" style="color: var(--text-secondary);">
+                        Tip: Make sure receipt is well-lit and flat
+                    </div>
+                </div>
+                <div id="cameraResults" class="hidden flex-1 overflow-y-auto">
+                    <div class="text-sm mb-2" style="color: var(--text-secondary);">Extracted Items:</div>
+                    <div id="extractedItems" class="space-y-2"></div>
+                    
+                    <!-- Add Missing Item Button -->
+                    <button class="btn btn-outline w-full mt-3 mb-2" onclick="showAddItemModal()" style="min-height: 44px; font-size: 14px;">
+                        [+] Add Missing Item
+                    </button>
+                    
+                    <!-- Receipt Summary -->
+                    <div id="receiptSummary" class="hidden card mt-4" style="border-color: var(--success);">
+                        <div class="text-sm font-bold mb-2" style="color: var(--success);">Scanned Summary</div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between"><span style="color: var(--text-secondary);">Subtotal:</span><span id="scannedSubtotal">$0.00</span></div>
+                            <div class="flex justify-between"><span style="color: var(--text-secondary);">Tax:</span><span id="scannedTax">$0.00</span></div>
+                            <div class="flex justify-between"><span style="color: var(--text-secondary);">Tip:</span><span id="scannedTip">$0.00</span></div>
+                            <div class="border-t pt-2 mt-2 flex justify-between font-bold" style="border-color: var(--border);"><span>Total:</span><span id="scannedTotal" style="color: var(--success);">$0.00</span></div>
+                        </div>
+                        <div class="mt-3 text-xs text-center" style="color: var(--text-secondary);">👆 Double-check items above before continuing</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Paste Tab -->
+            <div id="pasteSection" class="hidden flex-1 flex flex-col">
+                <textarea class="input flex-1 font-mono text-sm" id="receiptText" placeholder="Paste receipt text here...
+
+Example:
+2x Chicken Wings $24.00
+Caesar Salad $12.50
+Tax $3.65
+Tip $8.00
+Total $48.15"></textarea>
+            </div>
+            
+            <!-- Manual Tab -->
+            <div id="manualInput" class="hidden flex-1 flex flex-col">
+                <input type="text" class="input" id="manualName" placeholder="Item name">
+                <input type="number" class="input" id="manualPrice" placeholder="Price" step="0.01">
+                <button class="btn btn-outline w-full mb-4" onclick="addManualItem()">Add Item</button>
+            </div>
+            
+            <button class="btn btn-success w-full mb-6" id="continueBtn" onclick="processReceipt()" disabled style="opacity: 0.5;">Upload a receipt first</button>
+        </div>
+    </div>
+
+    <!-- Screen 6: Item Selection -->
+    <div class="screen" id="selectScreen">
+        <div class="pt-20 px-6 flex-1 flex flex-col">
+            <div class="mb-4">
+                <h2 class="text-xl font-bold">Claim Your Items</h2>
+                <div class="progress-bar mt-2">
+                    <div class="progress-fill" id="claimProgress" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="card orphan-glow mb-4 hidden" id="orphanAlert">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl" style="color: var(--warning);">[!]</span>
+                    <span><strong id="orphanCount">0</strong> items still need to be claimed!</span>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-3 pb-4" id="itemsList"></div>
+            <div class="pt-4 pb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <span style="color: var(--text-secondary);">Your Total:</span>
+                    <span class="text-2xl font-black" style="color: var(--success);" id="runningTotal">$0.00</span>
+                </div>
+                <button class="btn btn-success w-full" onclick="reviewSplit()">Review Split →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 7: Personal Review -->
+    <div class="screen" id="reviewScreen">
+        <div class="pt-20 px-6">
+            <h2 class="text-2xl font-bold mb-6 text-center">Your Split</h2>
+            <div class="text-center mb-6">
+                <div class="text-6xl font-black mb-2" style="color: var(--success);" id="yourTotalDisplay">$0.00</div>
+                <div style="color: var(--text-secondary);">You owe</div>
+            </div>
+            <div class="card mb-6">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">YOUR ITEMS:</div>
+                <div id="yourItems" class="space-y-2"></div>
+                <div class="border-t mt-4 pt-4 space-y-2" style="border-color: var(--border);">
+                    <div class="flex justify-between"><span style="color: var(--text-secondary);">Subtotal</span><span id="yourSubtotal">$0.00</span></div>
+                    <div class="flex justify-between"><span style="color: var(--text-secondary);">Tax</span><span id="yourTax">$0.00</span></div>
+                    <div class="flex justify-between"><span style="color: var(--text-secondary);">Tip</span><span id="yourTip">$0.00</span></div>
+                </div>
+            </div>
+
+            <!-- Payment Methods (for non-hosts) -->
+            <div class="card mb-6" id="payHostSection" style="display: none;">
+                <div class="text-sm mb-3" style="color: var(--text-secondary);">PAY THE HOST:</div>
+                <div id="paymentButtons" class="space-y-3"></div>
+            </div>
+
+            <div class="space-y-3">
+                <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good [OK]</button>
+                <button class="btn btn-outline w-full" onclick="backToSelection()">[Back] Go Back & Edit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 8: Group Settlement -->
+    <div class="screen" id="finalScreen">
+        <div class="pt-20 px-6">
+            <h2 class="text-2xl font-bold mb-6">Final Split</h2>
+            <div id="finalLeaderboard" class="space-y-3 mb-6"></div>
+            <div class="card mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <span style="color: var(--text-secondary);">Total Bill</span>
+                    <span class="font-bold" id="billTotal">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span style="color: var(--text-secondary);">Split between</span>
+                    <span id="splitCountDisplay">0 people</span>
+                </div>
+            </div>
+            <button class="btn btn-outline w-full" onclick="resetApp()">Start New Split</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * TABZEE - Logic & State
+         */
+
+        class ReceiptParser {
+          constructor() {
+            this.skipPatterns = [
+              /^(\d{5}(-\d{4})?)$/, // ZIP codes
+              /^\d+\s+(st|ave|rd|dr|blvd|ln|ct|way|pl|street|avenue|road)/i, // Addresses
+              /^(phone|fax|tel|www|http|email|date|time|server|cashier|order#|check#|receipt#)/i,
+              /^(payment|card|credit|debit|change|balance|cash|visa|mastercard|amex|discover)/i,
+              /^(thank|please|come|visit|follow|like|share)/i, // Marketing text
+              /^(subtotal|tax|tip|total|amount|balance)/i, // Financial summary words alone
+            ];
+          }
+
+          extractAllPrices(text) {
+            const patterns = [
+              /[$€£]?\s*(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})/g, // Standard $XX.XX
+              /(\d{1,3}(?:[,\s]?\d{3})*)\s*[\.\,]\s*(\d{2})\s*[$€£]?/g, // XX.XX$ format
+            ];
+            
+            const matches = [];
+            
+            for (const regex of patterns) {
+              let match;
+              while ((match = regex.exec(text)) !== null) {
+                if (matches.some(m => Math.abs(m.index - match.index) < 3)) continue;
+                
+                const raw = match[0];
+                const dollars = match[1].replace(/[,\s]/g, '');
+                const cents = match[2];
+                const value = parseFloat(`${dollars}.${cents}`);
+                
+                const lineStart = text.lastIndexOf('\n', match.index) + 1;
+                const lineEnd = text.indexOf('\n', match.index);
+                const line = text.substring(lineStart, lineEnd > -1 ? lineEnd : text.length).trim();
+                
+                matches.push({ raw, value, line, index: match.index });
+              }
+            }
+            
+            return matches.sort((a, b) => a.index - b.index);
+          }
+
+          identifyLineType(line) {
+            const lower = line.toLowerCase().trim();
+            
+            // Strong total indicators (must be at end or standalone)
+            if (/(^|\s)(total|amount\s*due|balance\s*due|grand\s*total|check\s*total)(\s*|:|$)/.test(lower) && 
+                !lower.includes('subtotal') && !lower.match(/item\s*total/)) {
+              return 'total';
+            }
+            
+            // Tax detection
+            if (/(^|\s)(tax|vat|gst|hst|sales\s*tax)(\s*|:|$)/.test(lower)) {
+              return 'tax';
+            }
+            
+            // Tip detection  
+            if (/(^|\s)(tip|gratuity|service\s*charge|service\s*fee)(\s*|:|$)/.test(lower)) {
+              return 'tip';
+            }
+            
+            // Subtotal detection
+            if (/(^|\s)(subtotal|sub\s*total|sub\s*-?\s*total|item\s*subtotal)(\s*|:|$)/.test(lower)) {
+              return 'subtotal';
+            }
+            
+            return 'item';
+          }
+
+          cleanItemName(line, price) {
+            let name = line;
+            
+            // Remove the price
+            name = name.replace(/[$€£]?\s*\d[\d,\s]*[\.\,]\s*\d{2}\s*[$€£]?/g, '');
+            
+            // Remove quantities at start
+            name = name.replace(/^(\d+)\s*[@x×\*\.\-]?\s*/i, '');
+            
+            // Remove item codes
+            name = name.replace(/^[@#]\s*\w+\s*/, '');
+            
+            // Clean up
+            name = name.replace(/\s+/g, ' ').trim();
+            name = name.replace(/^[-–—.:]+|[-–—.:]+$/g, '').trim();
+            
+            return name;
+          }
+
+          isValidItem(name, price) {
+            if (!name || name.length < 2) return false;
+            if (!price || price <= 0) return false;
+            if (!/[a-zA-Z]/.test(name)) return false;
+            
+            const lower = name.toLowerCase();
+            
+            for (const pattern of this.skipPatterns) {
+              if (pattern.test(lower)) return false;
+            }
+            
+            // Skip standalone financial words
+            const skipWords = ['total', 'tax', 'tip', 'subtotal', 'change', 'cash', 'credit', 
+                             'debit', 'gift', 'card', 'tendered', 'due', 'saved', 'discount',
+                             'amount', 'balance', 'payment'];
+            for (const word of skipWords) {
+              if (lower === word || lower.startsWith(word + ' ') || lower.endsWith(' ' + word)) return false;
+            }
+            
+            return true;
+          }
+
+          findTotal(prices) {
+            // First pass: look for explicit total label
+            for (const price of prices) {
+              const type = this.identifyLineType(price.line);
+              if (type === 'total') {
+                return { value: price.value, method: 'labeled' };
+              }
+            }
+            
+            // Second pass: find largest value in last 3 prices (excluding subtotal/tax/tip labels)
+            const sortedByPos = [...prices].sort((a, b) => a.index - b.index);
+            const lastFew = sortedByPos.slice(-4);
+            
+            let bestTotal = 0;
+            for (const price of lastFew) {
+              const type = this.identifyLineType(price.line);
+              if (type !== 'subtotal' && type !== 'tax' && type !== 'tip' && price.value > bestTotal) {
+                bestTotal = price.value;
+              }
+            }
+            
+            if (bestTotal > 0) {
+              return { value: bestTotal, method: 'largest_last' };
+            }
+            
+            // Fallback: largest overall
+            const sortedByVal = [...prices].sort((a, b) => b.value - a.value);
+            return { value: sortedByVal[0]?.value || 0, method: 'largest' };
+          }
+
+          findTaxAndTip(prices, total) {
+            let tax = 0;
+            let tip = 0;
+            let subtotal = 0;
+            
+            for (const price of prices) {
+              const type = this.identifyLineType(price.line);
+              const val = price.value;
+              
+              if (type === 'tax' && val !== total) {
+                tax = val;
+              } else if (type === 'tip' && val !== total) {
+                tip = val;
+              } else if (type === 'subtotal' && val !== total) {
+                subtotal = val;
+              }
+            }
+            
+            return { tax, tip, subtotal };
+          }
+
+          validateReceiptMath(items, tax, tip, total, subtotal) {
+            // Calculate what items sum to
+            const itemsTotal = items.reduce((sum, item) => sum + item.price, 0);
+            
+            // If we have subtotal, items should match it
+            if (subtotal > 0 && Math.abs(itemsTotal - subtotal) > 0.5) {
+              // Items don't match subtotal - possible issue
+              return { valid: false, issue: 'items_mismatch', itemsTotal, expected: subtotal };
+            }
+            
+            // If we have all values, check: items + tax + tip = total
+            const calculatedTotal = (subtotal || itemsTotal) + tax + tip;
+            
+            if (total > 0 && Math.abs(calculatedTotal - total) > 0.5) {
+              // Math doesn't add up
+              const diff = total - calculatedTotal;
+              
+              // Maybe we missed tax?
+              if (tax === 0 && diff > 0.5 && diff < total * 0.2) {
+                return { valid: true, adjustedTax: diff, note: 'added_missing_tax' };
+              }
+              
+              // Maybe we missed tip?
+              if (tip === 0 && diff > 0.5 && diff < total * 0.25) {
+                return { valid: true, adjustedTip: diff, note: 'added_missing_tip' };
+              }
+              
+              return { valid: false, issue: 'math_error', calculated: calculatedTotal, expected: total, diff };
+            }
+            
+            return { valid: true, itemsTotal };
+          }
+
+          parseReceiptText(text) {
+            if (!text) return { items: [], tax: 0, tip: 0, total: 0 };
+            
+            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            
+            const prices = this.extractAllPrices(text);
+            if (prices.length === 0) {
+              return { items: [], tax: 0, tip: 0, total: 0 };
+            }
+            
+            // Step 1: Find the total
+            const totalInfo = this.findTotal(prices);
+            const total = totalInfo.value;
+            
+            // Step 2: Find tax, tip, subtotal
+            const { tax, tip, subtotal } = this.findTaxAndTip(prices, total);
+            
+            // Step 3: Extract items (prices that aren't total/tax/tip/subtotal)
+            let items = [];
+            const usedIndices = new Set();
+            
+            // Mark used prices
+            for (const price of prices) {
+              const type = this.identifyLineType(price.line);
+              if (type !== 'item' || price.value === total) {
+                usedIndices.add(price.index);
+              }
+            }
+            
+            for (const price of prices) {
+              if (usedIndices.has(price.index)) continue;
+              if (price.value === total) continue;
+              if (price.value < 0.5) continue; // Too small
+              
+              // Skip if close to tax/tip/total (within 1 cent)
+              const closeToTax = tax > 0 && Math.abs(price.value - tax) < 0.01;
+              const closeToTip = tip > 0 && Math.abs(price.value - tip) < 0.01;
+              const closeToTotal = Math.abs(price.value - total) < 0.01;
+              
+              if (closeToTax || closeToTip || closeToTotal) continue;
+              
+              const name = this.cleanItemName(price.line, price.value);
+              
+              if (this.isValidItem(name, price.value)) {
+                let qty = 1;
+                const qtyMatch = price.line.match(/^(\d+)\s*[@x×\*\.\-]?\s*/i);
+                if (qtyMatch) {
+                  qty = parseInt(qtyMatch[1]);
+                  if (qty > 50 || qty < 1) qty = 1;
+                }
+                
+                items.push({ name, price: price.value, quantity: qty });
+              }
+            }
+            
+            // Step 4: Combine duplicates
+            const combinedItems = [];
+            const itemMap = new Map();
+            
+            for (const item of items) {
+              const key = item.name.toLowerCase().trim();
+              if (itemMap.has(key)) {
+                const existing = itemMap.get(key);
+                existing.quantity += item.quantity;
+                existing.price += item.price;
+              } else {
+                combinedItems.push({ ...item });
+                itemMap.set(key, combinedItems[combinedItems.length - 1]);
+              }
+            }
+            
+            // Step 5: Calculate subtotal if missing
+            const calculatedSubtotal = combinedItems.reduce((sum, item) => sum + item.price, 0);
+            const finalSubtotal = subtotal > 0 ? subtotal : calculatedSubtotal;
+            
+            // Step 6: Validate and adjust
+            let finalTax = tax;
+            let finalTip = tip;
+            
+            const validation = this.validateReceiptMath(combinedItems, tax, tip, total, finalSubtotal);
+            
+            if (validation.adjustedTax) {
+              finalTax = validation.adjustedTax;
+            }
+            if (validation.adjustedTip) {
+              finalTip = validation.adjustedTip;
+            }
+            
+            return { 
+              items: combinedItems, 
+              tax: finalTax, 
+              tip: finalTip, 
+              total,
+              subtotal: finalSubtotal,
+              validation,
+              totalMethod: totalInfo.method
+            };
+          }
+        }
+
+        const EMOJIS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
+        const parser = new ReceiptParser();
+        
+        // Storage wrapper with error handling and fallback
+        const storage = {
+            _memory: {},
+            _available: null,
+            isAvailable() {
+                if (this._available !== null) return this._available;
+                try {
+                    const test = '__test__';
+                    localStorage.setItem(test, test);
+                    localStorage.removeItem(test);
+                    this._available = true;
+                    return true;
+                } catch (e) {
+                    this._available = false;
+                    console.warn('localStorage not available, using memory fallback');
+                    return false;
+                }
+            },
+            getItem(key) {
+                if (this.isAvailable()) {
+                    try { return localStorage.getItem(key); } catch (e) { return this._memory[key] || null; }
+                }
+                return this._memory[key] || null;
+            },
+            setItem(key, value) {
+                if (this.isAvailable()) {
+                    try { localStorage.setItem(key, value); } catch (e) { this._memory[key] = value; }
+                } else {
+                    this._memory[key] = value;
+                }
+            },
+            removeItem(key) {
+                if (this.isAvailable()) {
+                    try { localStorage.removeItem(key); } catch (e) { delete this._memory[key]; }
+                } else {
+                    delete this._memory[key];
+                }
+            },
+            clear() {
+                if (this.isAvailable()) {
+                    try { localStorage.clear(); } catch (e) { this._memory = {}; }
+                } else {
+                    this._memory = {};
+                }
+            }
+        };
+        
+        // Supabase config
+        const SUPABASE_URL = 'https://idjjrpaixhhkpattgwbj.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkampycGFpeGhoa3BhdHRnd2JqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzODEzNjcsImV4cCI6MjA4Njk1NzM2N30.VobYBbh2A8pLzaX9f2YaOYQ0ee5a1c6yI4NophzYHOY';
+        let supabaseClient = null;
+        
+        // Initialize Supabase if available
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+            try {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log('Supabase initialized');
+            } catch(e) {
+                console.log('Supabase init failed:', e);
+            }
+        }
+        
+        let state = {
+            roomCode: null,
+            userId: null,
+            userName: null,
+            userEmoji: null,
+            isHost: false,
+            session: {
+                participants: [],
+                items: [],
+                tax: 0,
+                tip: 0,
+                selections: {}, // itemId -> Array of {userId, type, value}
+                status: 'lobby',
+                lastModified: 0
+            }
+        };
+
+        window.onload = () => {
+            // Clear any previous session on load (Bug 1 fix: reset on refresh)
+            storage.removeItem('TABZEE_user_state');
+            
+            // Check for room code in URL (Bug 8 fix: auto-join from shared link)
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            
+            if (roomFromUrl && roomFromUrl.length === 6) {
+                // Auto-join from shared link - validate room exists first
+                const code = roomFromUrl.toUpperCase();
+                
+                // BUG 9 FIX: Check if user was previously kicked from this room
+                const kickedKey = 'kicked_from_' + code;
+                const wasKicked = storage.getItem(kickedKey);
+                
+                if (wasKicked) {
+                    alert('You were removed from this room by the host. You cannot rejoin.');
+                    // Clear the URL param
+                    if (window.history.replaceState) {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    initEmojiGrid();
+                    startSync();
+                    return;
+                }
+                
+                // Validate room exists before proceeding (Bug 8 fix)
+                tryFetchRoom(code).then((roomData) => {
+                    if (roomData) {
+                        // Room exists - proceed to name entry
+                        state.roomCode = code;
+                        state.session = roomData;
+                        state.isHost = false;
+                        state.userId = generateId();
+                        initEmojiGrid();
+                        showNameModal();
+                        startSync();
+                    } else {
+                        // Room not found - show error and stay on welcome screen
+                        alert('Room "' + code + '" not found! The link may be expired or invalid.');
+                        // Clear the URL param
+                        if (window.history.replaceState) {
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }
+                        initEmojiGrid();
+                        startSync();
+                    }
+                });
+            } else {
+                loadSession();
+                initEmojiGrid();
+                startSync();
+            }
+        };
+
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+        function generateCode() {
+            // Exclude 0, O, 1, I to avoid confusion
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+        
+        function createLocalStub(code) {
+            const stub = {
+                items: [],
+                participants: [],
+                status: 'lobby',
+                lastModified: Date.now()
+            };
+            state.session = stub;
+            storage.setItem('room_' + code, JSON.stringify(stub));
+        }
+
+        function loadSession() {
+            // Clear any in-progress state on page refresh (Bug 1 fix)
+            storage.removeItem('TABZEE_user_state');
+            // Don't auto-restore - force user to rejoin
+        }
+
+        function saveSession() {
+            state.session.lastModified = Date.now();
+            storage.setItem('TABZEE_user_state', JSON.stringify(state));
+            storage.setItem('room_' + state.roomCode, JSON.stringify(state.session));
+            
+            // Also save to Supabase for cross-device sync
+            if (supabaseClient && state.roomCode) {
+                supabaseClient.from('rooms').upsert({
+                    code: state.roomCode,
+                    data: state.session,
+                    created_at: new Date().toISOString()
+                }).then(() => {
+                    console.log('Saved to Supabase');
+                }).catch((err) => {
+                    console.log('Supabase save error:', err);
+                });
+            }
+        }
+
+        function startSync() {
+            setInterval(() => {
+                if (!state.roomCode) return;
+                
+                // BUG 9 FIX: Check if current user was kicked before updating
+                if (checkIfKicked()) return;
+                
+                // First check storage (fast)
+                const localData = storage.getItem('room_' + state.roomCode);
+                if (localData) {
+                    const parsed = JSON.parse(localData);
+                    if (parsed.lastModified > state.session.lastModified) {
+                        state.session = parsed;
+                        updateUI();
+                        return;
+                    }
+                }
+                
+                // Then check Supabase (for cross-device)
+                if (supabaseClient) {
+                    supabaseClient.from('rooms').select('*').eq('code', state.roomCode).single()
+                        .then((result) => {
+                            if (result.data && result.data.data.lastModified > state.session.lastModified) {
+                                state.session = result.data.data;
+                                storage.setItem('room_' + state.roomCode, JSON.stringify(result.data.data));
+                                updateUI();
+                            }
+                        }).catch(() => {
+                            // Supabase error, ignore
+                        });
+                }
+            }, 2000);
+        }
+
+        // Screen history for back/forward navigation (Bug 7 fix)
+        const screenHistory = [];
+        let currentScreenId = 'welcome';
+        
+        function showScreen(id, pushHistory = true) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id + 'Screen').classList.add('active');
+            document.getElementById('nav').style.display = id === 'welcome' ? 'none' : 'flex';
+            
+            // Push state for browser back/forward support
+            if (pushHistory && id !== currentScreenId) {
+                currentScreenId = id;
+                if (history.state?.screen !== id) {
+                    history.pushState({ screen: id }, '', window.location.pathname + window.location.search);
+                }
+            }
+        }
+        
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', (e) => {
+            if (e.state && e.state.screen) {
+                currentScreenId = e.state.screen;
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(e.state.screen + 'Screen').classList.add('active');
+                document.getElementById('nav').style.display = e.state.screen === 'welcome' ? 'none' : 'flex';
+            } else {
+                // No state - go to welcome
+                showScreen('welcome', false);
+            }
+        });
+        
+        // Go home function for logo click (Bug 1 fix)
+        function goHome() {
+            // BUG 10 FIX: If on welcome screen already, just refresh/reset
+            const currentScreen = document.querySelector('.screen.active');
+            if (currentScreen && currentScreen.id === 'welcomeScreen') {
+                // Already on welcome, clear any state and reload
+                clearAllRoomState();
+                location.reload();
+                return;
+            }
+            
+            // Show custom confirmation modal
+            showConfirmModal(
+                'Leave Split?',
+                'You will lose your progress in this split. Are you sure?',
+                () => leaveRoom()
+            );
+        }
+        
+        // Custom confirmation modal functions
+        function showConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmModal').classList.add('active');
+            
+            // Store callback
+            window.confirmCallback = onConfirm;
+        }
+        
+        function hideConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+            window.confirmCallback = null;
+        }
+        
+        function confirmModalYes() {
+            if (window.confirmCallback) {
+                window.confirmCallback();
+            }
+            hideConfirmModal();
+        }
+
+        // BUG 12 FIX: Clear all room state for fresh session
+        function clearAllRoomState() {
+            // Clear all room-related localStorage keys
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('room_') || key === 'TABZEE_user_state')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => storage.removeItem(key));
+            
+            // Reset state
+            state.roomCode = null;
+            state.userId = null;
+            state.userName = null;
+            state.userEmoji = null;
+            state.isHost = false;
+            state.session = {
+                participants: [],
+                items: [],
+                tax: 0,
+                tip: 0,
+                selections: {},
+                status: 'lobby',
+                lastModified: 0
+            };
+            extractedItemsFromImage = [];
+        }
+        
+        // Initialize history state
+        history.replaceState({ screen: 'welcome' }, '', window.location.pathname + window.location.search);
+        
+        // Before unload handler - clear state on page refresh (Bug 1 fix)
+        window.addEventListener('beforeunload', () => {
+            storage.removeItem('TABZEE_user_state');
+        });
+
+        function createRoom() {
+            // BUG 12 FIX: Always create fresh session, clear any previous room state
+            clearAllRoomState();
+            
+            state.roomCode = generateCode();
+            state.isHost = true;
+            state.userId = generateId();
+            showNameModal();
+        }
+
+        function showJoin() { document.getElementById('joinModal').classList.add('active'); document.getElementById('p1').focus(); }
+        function hideJoin() { document.getElementById('joinModal').classList.remove('active'); }
+        function handlePinKey(event, n) {
+            const input = document.getElementById('p' + n);
+            
+            // Handle backspace
+            if (event.key === 'Backspace') {
+                event.preventDefault();
+                if (input.value === '') {
+                    // If empty, move to previous input
+                    if (n > 1) {
+                        const prev = document.getElementById('p' + (n - 1));
+                        prev.focus();
+                        prev.value = '';
+                    }
+                } else {
+                    // Clear current input
+                    input.value = '';
+                }
+            }
+            // Handle left arrow
+            else if (event.key === 'ArrowLeft' && n > 1) {
+                event.preventDefault();
+                document.getElementById('p' + (n - 1)).focus();
+            }
+            // Handle right arrow
+            else if (event.key === 'ArrowRight' && n < 6) {
+                event.preventDefault();
+                document.getElementById('p' + (n + 1)).focus();
+            }
+        }
+
+        function nextPin(n) {
+            const input = document.getElementById('p' + n);
+            // Only move forward if user typed a character (not backspace/delete)
+            if (input.value.length === 1 && n < 6) {
+                document.getElementById('p' + (n + 1)).focus();
+            }
+        }
+
+        function joinRoom() {
+            const code = [1,2,3,4,5,6].map(i => document.getElementById('p'+i).value).join('').toUpperCase();
+            if (code.length < 6) return;
+            
+            // Validate room exists before joining (Bug 2 fix)
+            tryFetchRoom(code).then((roomData) => {
+                if (roomData) {
+                    // BUG 9 FIX: Check if user was previously kicked from this room
+                    // We need to check localStorage for a kicked flag
+                    const kickedKey = 'kicked_from_' + code;
+                    const wasKicked = storage.getItem(kickedKey);
+                    
+                    if (wasKicked) {
+                        alert('You were removed from this room by the host. You cannot rejoin.');
+                        // Clear the PIN inputs
+                        [1,2,3,4,5,6].forEach(i => document.getElementById('p'+i).value = '');
+                        document.getElementById('p1').focus();
+                        return;
+                    }
+                    
+                    // Room exists - proceed to join
+                    state.session = roomData;
+                    state.roomCode = code;
+                    state.isHost = false;
+                    state.userId = generateId();
+                    
+                    // Clear URL params if present
+                    if (window.history.replaceState) {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    
+                    hideJoin();
+                    showNameModal();
+                } else {
+                    // Room not found - show error (Bug 2 fix)
+                    alert('Room not found! Please check the code and try again.');
+                    // Clear the PIN inputs
+                    [1,2,3,4,5,6].forEach(i => document.getElementById('p'+i).value = '');
+                    document.getElementById('p1').focus();
+                }
+            });
+        }
+        
+        function tryFetchRoom(code) {
+            return new Promise((resolve) => {
+                // Try Supabase first
+                if (supabaseClient) {
+                    supabaseClient.from('rooms').select('*').eq('code', code).single()
+                        .then((result) => {
+                            if (result.data) {
+                                storage.setItem('room_' + code, JSON.stringify(result.data.data));
+                                resolve(result.data.data);
+                            } else {
+                                // Not in Supabase, try storage
+                                const localData = storage.getItem('room_' + code);
+                                resolve(localData ? JSON.parse(localData) : null);
+                            }
+                        })
+                        .catch(() => {
+                            // Supabase error, try storage
+                            const localData = storage.getItem('room_' + code);
+                            resolve(localData ? JSON.parse(localData) : null);
+                        });
+                } else {
+                    // No Supabase, just check storage
+                    const localData = storage.getItem('room_' + code);
+                    resolve(localData ? JSON.parse(localData) : null);
+                }
+            });
+        }
+
+        function showNameModal() { document.getElementById('nameModal').classList.add('active'); }
+        
+        function backToWelcome() {
+            // Reset state
+            state.roomCode = null;
+            state.isHost = false;
+            state.userId = null;
+            document.getElementById('nameModal').classList.remove('active');
+            document.getElementById('userName').value = '';
+            showScreen('welcome');
+        }
+        
+        function leaveRoom() {
+            // Remove user from participants
+            if (state.roomCode && state.userId) {
+                state.session.participants = state.session.participants.filter(p => p.id !== state.userId);
+                saveSession();
+            }
+            // Reset and go back to welcome
+            // BUG 10 FIX: Clear kicked flags for this room so user can join other rooms
+            if (state.roomCode) {
+                storage.removeItem('kicked_from_' + state.roomCode);
+                storage.removeItem('kicked_user_' + state.userId + '_' + state.roomCode);
+            }
+            state.roomCode = null;
+            state.isHost = false;
+            state.userId = null;
+            storage.removeItem('TABZEE_user_state');
+            showScreen('welcome');
+        }
+        
+        function initEmojiGrid() {
+            const grid = document.getElementById('emojiGrid');
+            EMOJIS.forEach((e, i) => {
+                const d = document.createElement('div');
+                d.className = 'avatar cursor-pointer' + (i === 0 ? ' me' : '');
+                d.textContent = e;
+                d.onclick = () => {
+                    document.querySelectorAll('#emojiGrid .avatar').forEach(a => a.classList.remove('me'));
+                    d.classList.add('me');
+                    state.userEmoji = e;
+                };
+                grid.appendChild(d);
+            });
+            state.userEmoji = EMOJIS[0];
+        }
+
+        function setUser() {
+            const name = document.getElementById('userName').value.trim();
+            if (!name) return;
+            state.userName = name;
+            state.session.participants.push({ id: state.userId, name, emoji: state.userEmoji, isHost: state.isHost });
+            document.getElementById('nameModal').classList.remove('active');
+            document.getElementById('roomDisplay').textContent = state.roomCode;
+            saveSession();
+            showLobby();
+        }
+
+        function showLobby() {
+            showScreen('lobby');
+            document.getElementById('lobbyCode').textContent = state.roomCode;
+            document.getElementById('startBtn').style.display = state.isHost ? 'block' : 'none';
+            
+            // Show payment section for host only
+            const paymentSection = document.getElementById('paymentSection');
+            if (state.isHost) {
+                paymentSection.style.display = 'block';
+                loadPaymentMethods();
+            } else {
+                paymentSection.style.display = 'none';
+            }
+            
+            renderPlayers();
+        }
+
+        function savePaymentMethods() {
+            if (!state.isHost) return;
+            
+            state.session.paymentMethods = {
+                venmo: document.getElementById('venmoLink').value,
+                cashapp: document.getElementById('cashappLink').value,
+                paypal: document.getElementById('paypalLink').value,
+                applepay: document.getElementById('applePayLink').value
+            };
+            saveSession();
+        }
+
+        function loadPaymentMethods() {
+            if (state.session.paymentMethods) {
+                document.getElementById('venmoLink').value = state.session.paymentMethods.venmo || '';
+                document.getElementById('cashappLink').value = state.session.paymentMethods.cashapp || '';
+                document.getElementById('paypalLink').value = state.session.paymentMethods.paypal || '';
+                document.getElementById('applePayLink').value = state.session.paymentMethods.applepay || '';
+            }
+        }
+
+        function shareRoom() {
+            const shareUrl = window.location.origin + window.location.pathname + '?room=' + state.roomCode;
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Join my TABZEE room',
+                    text: 'Room code: ' + state.roomCode,
+                    url: shareUrl
+                });
+            } else {
+                navigator.clipboard.writeText(shareUrl);
+                alert('Link copied! Send this to your friends:\n' + shareUrl);
+            }
+        }
+
+        function renderPlayers() {
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            state.session.participants.forEach(p => {
+                const d = document.createElement('div');
+                d.className = 'flex flex-col items-center gap-1';
+                
+                // BUG 9 FIX: Add X button for host (only for other users, not self)
+                const showKickButton = state.isHost && p.id !== state.userId;
+                
+                d.innerHTML = `
+                    <div class="avatar-wrapper">
+                        <div class="avatar ${p.id === state.userId ? 'me' : ''}">${p.emoji}</div>
+                        ${showKickButton ? `<div class="avatar-remove" onclick="kickUser('${p.id}')" title="Remove ${p.name}">×</div>` : ''}
+                    </div>
+                    <div class="text-xs text-gray-400">${p.name}</div>
+                `;
+                list.appendChild(d);
+            });
+        }
+        
+        // BUG 9 FIX: Kick/remove user function
+        function kickUser(userId) {
+            if (!state.isHost) return;
+            
+            const userToKick = state.session.participants.find(p => p.id === userId);
+            if (!userToKick) return;
+            
+            // Use custom confirm modal
+            showConfirmModal(
+                'Remove Player?',
+                `Remove ${userToKick.name} from this split?`,
+                () => {
+                    // Remove user from participants
+                    state.session.participants = state.session.participants.filter(p => p.id !== userId);
+                    
+                    // Remove user's selections
+                    for (const itemId in state.session.selections) {
+                        state.session.selections[itemId] = state.session.selections[itemId].filter(s => s.userId !== userId);
+                    }
+                    
+                    // Mark this user as kicked so they can't rejoin (store in session)
+                    if (!state.session.kickedUsers) state.session.kickedUsers = [];
+                    state.session.kickedUsers.push(userId);
+                    
+                    // Also store in localStorage with user-specific key for cross-session tracking
+                    storage.setItem('kicked_user_' + userId + '_' + state.roomCode, 'true');
+                    
+                    saveSession();
+                    renderPlayers();
+                }
+            );
+        }
+        
+        // BUG 9 FIX: Check if current user was kicked and show message
+        function checkIfKicked() {
+            if (!state.roomCode || !state.userId) return false;
+            
+            // Check if user is still in participants list
+            const stillInRoom = state.session.participants.find(p => p.id === state.userId);
+            
+            // Check if user was marked as kicked
+            const kickedFlag = storage.getItem('kicked_user_' + state.userId + '_' + state.roomCode);
+            const inKickedList = state.session.kickedUsers && state.session.kickedUsers.includes(state.userId);
+            
+            if ((!stillInRoom && inKickedList) || kickedFlag) {
+                // User was kicked
+                alert('You were removed from this room by the host.');
+                
+                // Clear kicked flag
+                storage.removeItem('kicked_user_' + state.userId + '_' + state.roomCode);
+                
+                // Mark as kicked to prevent rejoin
+                storage.setItem('kicked_from_' + state.roomCode, 'true');
+                
+                // Reset and go home
+                state.roomCode = null;
+                state.isHost = false;
+                state.userId = null;
+                storage.removeItem('TABZEE_user_state');
+                showScreen('welcome');
+                return true;
+            }
+            
+            return false;
+        }
+
+        function goToReceipt() { state.session.status = 'receipt'; saveSession(); showScreen('receipt'); }
+
+        function setTab(t) {
+            document.getElementById('cameraSection').classList.toggle('hidden', t !== 'camera');
+            document.getElementById('pasteSection').classList.toggle('hidden', t !== 'paste');
+            document.getElementById('manualInput').classList.toggle('hidden', t !== 'manual');
+            document.getElementById('tab-camera').style.background = t === 'camera' ? 'var(--primary)' : 'transparent';
+            document.getElementById('tab-paste').style.background = t === 'paste' ? 'var(--primary)' : 'transparent';
+            document.getElementById('tab-manual').style.background = t === 'manual' ? 'var(--primary)' : 'transparent';
+            
+            // Update continue button based on tab and state
+            const continueBtn = document.getElementById('continueBtn');
+            if (t === 'paste') {
+                // Enable for paste tab (user can type manually)
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.textContent = 'Continue';
+            } else if (t === 'manual') {
+                // Enable for manual tab
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.textContent = 'Continue';
+            } else if (t === 'camera') {
+                // For camera tab, check if we have scanned items
+                if (extractedItemsFromImage.length === 0) {
+                    continueBtn.disabled = true;
+                    continueBtn.style.opacity = '0.5';
+                    continueBtn.textContent = 'Upload a receipt first';
+                } else {
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    continueBtn.textContent = 'Continue';
+                }
+            }
+        }
+
+        let extractedItemsFromImage = [];
+
+        function triggerCamera() {
+            document.getElementById('receiptImage').click();
+        }
+
+        function triggerGallery() {
+            document.getElementById('galleryImage').click();
+        }
+
+        function rescanReceipt() {
+            // Reset and open camera again
+            document.getElementById('cameraResults').classList.add('hidden');
+            document.getElementById('rescanButtons').classList.add('hidden');
+            document.getElementById('receiptSummary').classList.add('hidden');
+            extractedItemsFromImage = [];
+            triggerCamera();
+        }
+
+        function rescanGallery() {
+            // Reset and open gallery again
+            document.getElementById('cameraResults').classList.add('hidden');
+            document.getElementById('rescanButtons').classList.add('hidden');
+            document.getElementById('receiptSummary').classList.add('hidden');
+            extractedItemsFromImage = [];
+            triggerGallery();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('cameraPreview').classList.remove('hidden');
+                document.getElementById('cameraButtons').classList.add('hidden');
+                document.getElementById('scanningOverlay').classList.remove('hidden');
+                
+                // Simulate OCR processing
+                setTimeout(() => {
+                    simulateOCR();
+                }, 2000);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Google Vision API Configuration
+        // SECURITY: Add your API key here. Get one at https://console.cloud.google.com/
+        // Then add HTTP referrer restrictions to prevent abuse
+        const GOOGLE_VISION_API_KEY = ''; // Add your key here
+        
+        // Image preprocessing for better OCR
+        async function preprocessImage(imageBase64) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set canvas size
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Draw original
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Get image data
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    // Apply preprocessing: grayscale + contrast + threshold
+                    for (let i = 0; i < data.length; i += 4) {
+                        // Convert to grayscale
+                        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                        
+                        // Increase contrast
+                        const contrast = 1.5;
+                        const adjusted = ((gray - 128) * contrast) + 128;
+                        
+                        // Apply threshold (binarize) - makes text sharper
+                        const threshold = 150;
+                        const final = adjusted > threshold ? 255 : 0;
+                        
+                        data[i] = final;     // R
+                        data[i + 1] = final; // G
+                        data[i + 2] = final; // B
+                        // Alpha stays the same
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.src = imageBase64;
+            });
+        }
+        
+        async function scanWithGoogleVision(imageBase64) {
+            // Preprocess image first
+            const processedImage = await preprocessImage(imageBase64);
+            
+            const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    requests: [{
+                        image: { content: processedImage.split(',')[1] },
+                        features: [
+                            { type: 'DOCUMENT_TEXT_DETECTION' }, // Better for receipts!
+                            { type: 'TEXT_DETECTION' }            // Fallback
+                        ]
+                    }]
+                })
+            });
+            
+            if (!response.ok) throw new Error('Google Vision API failed');
+            
+            const data = await response.json();
+            // Try DOCUMENT_TEXT_DETECTION first, then TEXT_DETECTION
+            const response1 = data.responses[0];
+            return response1?.fullTextAnnotation?.text || 
+                   response1?.textAnnotations?.[0]?.description || 
+                   '';
+        }
+        
+        async function simulateOCR() {
+            const img = document.getElementById('previewImg');
+            const scanningOverlay = document.getElementById('scanningOverlay');
+            const continueBtn = document.getElementById('continueBtn');
+            
+            // Disable continue button while scanning
+            continueBtn.disabled = true;
+            continueBtn.style.opacity = '0.5';
+            continueBtn.textContent = '🔍 Scanning...';
+            
+            let text = '';
+            
+            try {
+                scanningOverlay.innerHTML = '<div class="text-center text-green-400 font-bold">Reading receipt with AI...</div>';
+                
+                // Try Google Vision API first (if key is configured)
+                if (GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY !== 'YOUR_API_KEY_HERE') {
+                    try {
+                        text = await scanWithGoogleVision(img.src);
+                        console.log('Google Vision OCR Result:', text);
+                    } catch (gvError) {
+                        console.log('Google Vision failed, falling back to Tesseract:', gvError);
+                        scanningOverlay.innerHTML = '<div class="text-center text-yellow-400 font-bold">[AI] Falling back to local OCR...</div>';
+                    }
+                }
+                
+                // Fallback to Tesseract if Google Vision failed or not configured
+                if (!text) {
+                    const result = await Tesseract.recognize(img.src, 'eng', {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                scanningOverlay.innerHTML = `<div class="text-center text-green-400 font-bold">🔍 ${Math.round(m.progress * 100)}%</div>`;
+                            }
+                        }
+                    });
+                    text = result.data.text;
+                    console.log('Tesseract OCR Result:', text);
+                }
+                
+                // Parse the OCR text
+                const parsed = parser.parseReceiptText(text);
+                
+                // Convert to extracted items format
+                extractedItemsFromImage = parsed.items.map(item => ({
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity || 1
+                }));
+                
+                // Add tax/tip if found
+                if (parsed.tax > 0) {
+                    extractedItemsFromImage.push({ name: 'Tax', price: parsed.tax, quantity: 1, isTax: true });
+                }
+                if (parsed.tip > 0) {
+                    extractedItemsFromImage.push({ name: 'Tip', price: parsed.tip, quantity: 1, isTip: true });
+                }
+                
+                // If no items found, show raw text for manual editing
+                if (extractedItemsFromImage.length === 0) {
+                    document.getElementById('receiptText').value = text;
+                    setTab('paste');
+                    alert('Could not parse receipt automatically. Please review the text and edit as needed.');
+                    scanningOverlay.classList.add('hidden');
+                    // Enable continue button for manual mode
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    continueBtn.textContent = 'Continue';
+                    return;
+                }
+                
+                scanningOverlay.classList.add('hidden');
+                document.getElementById('cameraResults').classList.remove('hidden');
+                document.getElementById('rescanButtons').classList.remove('hidden');
+                renderExtractedItems();
+                
+                // Show summary
+                showReceiptSummary(parsed);
+                
+                // Enable continue button after successful scan
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.textContent = 'Continue';
+                
+            } catch (error) {
+                console.error('OCR Error:', error);
+                scanningOverlay.innerHTML = '<div class="text-center text-red-400 font-bold">Error reading receipt</div>';
+                document.getElementById('rescanButtons').classList.remove('hidden');
+                continueBtn.textContent = 'Error - Try Paste Instead';
+                setTimeout(() => {
+                    scanningOverlay.classList.add('hidden');
+                    setTab('paste');
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    continueBtn.textContent = 'Continue';
+                }, 2000);
+            }
+        }
+        
+        function showReceiptSummary(parsed) {
+            const foodItems = parsed.items;
+            // Note: item.price is already the total for that line (after combining duplicates)
+            // So we just sum the prices, not multiply by quantity
+            const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
+            const total = subtotal + parsed.tax + parsed.tip;
+            
+            document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('scannedTax').textContent = '$' + parsed.tax.toFixed(2);
+            document.getElementById('scannedTip').textContent = '$' + parsed.tip.toFixed(2);
+            document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('receiptSummary').classList.remove('hidden');
+        }
+
+        function renderExtractedItems() {
+            const container = document.getElementById('extractedItems');
+            container.innerHTML = '';
+            
+            extractedItemsFromImage.forEach((item, i) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-3 rounded-lg';
+                div.style.background = item.isTax || item.isTip ? 'rgba(139, 92, 246, 0.1)' : 'var(--surface-light)';
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</div>
+                        ${item.isTax || item.isTip ? '<div class="text-xs text-purple-400">Auto-detected</div>' : ''}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-green-400">$${item.price.toFixed(2)}</span>
+                        <button class="text-red-400" onclick="removeExtractedItem(${i})">[X]</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            
+            // Set the session items
+            const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
+            const taxItem = extractedItemsFromImage.find(i => i.isTax);
+            const tipItem = extractedItemsFromImage.find(i => i.isTip);
+            
+            state.session.items = foodItems.map((it, i) => ({ ...it, id: 'it_' + i }));
+            state.session.tax = taxItem ? taxItem.price : 0;
+            state.session.tip = tipItem ? tipItem.price : 0;
+        }
+
+        function removeExtractedItem(index) {
+            extractedItemsFromImage.splice(index, 1);
+            renderExtractedItems();
+            
+            // Update continue button and summary if no items left
+            const continueBtn = document.getElementById('continueBtn');
+            if (extractedItemsFromImage.length === 0) {
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+                continueBtn.textContent = '📷 Upload a receipt first';
+                document.getElementById('receiptSummary').classList.add('hidden');
+            } else {
+                // Recalculate and show updated summary (price is already total)
+                const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
+                const taxItem = extractedItemsFromImage.find(i => i.isTax);
+                const tipItem = extractedItemsFromImage.find(i => i.isTip);
+                const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
+                const tax = taxItem ? taxItem.price : 0;
+                const tip = tipItem ? tipItem.price : 0;
+                const total = subtotal + tax + tip;
+                
+                document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
+                document.getElementById('scannedTax').textContent = '$' + tax.toFixed(2);
+                document.getElementById('scannedTip').textContent = '$' + tip.toFixed(2);
+                document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
+            }
+        }
+
+        function showAddItemModal() {
+            document.getElementById('addItemModal').classList.add('active');
+            document.getElementById('newItemName').focus();
+        }
+
+        function hideAddItemModal() {
+            document.getElementById('addItemModal').classList.remove('active');
+            document.getElementById('newItemName').value = '';
+            document.getElementById('newItemPrice').value = '';
+            document.getElementById('newItemQty').value = '1';
+        }
+
+        function addManualItem() {
+            const name = document.getElementById('manualName').value.trim();
+            const price = parseFloat(document.getElementById('manualPrice').value);
+            
+            if (!name || isNaN(price) || price <= 0) {
+                alert('Please enter a valid item name and price');
+                return;
+            }
+            
+            // Add to extracted items
+            extractedItemsFromImage.push({ name, price, quantity: 1 });
+            
+            // Clear inputs
+            document.getElementById('manualName').value = '';
+            document.getElementById('manualPrice').value = '';
+            
+            // Enable continue button since we have items
+            const continueBtn = document.getElementById('continueBtn');
+            continueBtn.disabled = false;
+            continueBtn.style.opacity = '1';
+            continueBtn.textContent = 'Continue with ' + extractedItemsFromImage.length + ' item' + (extractedItemsFromImage.length > 1 ? 's' : '');
+            
+            alert('Item added: ' + name + ' - $' + price.toFixed(2));
+        }
+
+        function addMissingItem() {
+            const name = document.getElementById('newItemName').value.trim();
+            const price = parseFloat(document.getElementById('newItemPrice').value);
+            const qty = parseInt(document.getElementById('newItemQty').value) || 1;
+            
+            if (!name || isNaN(price) || price <= 0) {
+                alert('Please enter a valid item name and price');
+                return;
+            }
+            
+            extractedItemsFromImage.push({ name, price, quantity: qty });
+            renderExtractedItems();
+            
+            // Recalculate summary (price is already total for that item)
+            const foodItems = extractedItemsFromImage.filter(i => !i.isTax && !i.isTip);
+            const taxItem = extractedItemsFromImage.find(i => i.isTax);
+            const tipItem = extractedItemsFromImage.find(i => i.isTip);
+            const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
+            const tax = taxItem ? taxItem.price : 0;
+            const tip = tipItem ? tipItem.price : 0;
+            const total = subtotal + tax + tip;
+            
+            document.getElementById('scannedSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('scannedTax').textContent = '$' + tax.toFixed(2);
+            document.getElementById('scannedTip').textContent = '$' + tip.toFixed(2);
+            document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('receiptSummary').classList.remove('hidden');
+            
+            // Enable continue button
+            const continueBtn = document.getElementById('continueBtn');
+            continueBtn.disabled = false;
+            continueBtn.style.opacity = '1';
+            continueBtn.textContent = 'Continue';
+            
+            hideAddItemModal();
+        }
+
+        function processReceipt() {
+            // Check if we have items from camera or from text paste
+            if (extractedItemsFromImage.length > 0) {
+                // Already set from camera
+            } else {
+                const text = document.getElementById('receiptText').value;
+                const parsed = parser.parseReceiptText(text);
+                state.session.items = parsed.items.map((it, i) => ({ ...it, id: 'it_' + i }));
+                state.session.tax = parsed.tax;
+                state.session.tip = parsed.tip;
+            }
+            
+            if (state.session.items.length === 0) {
+                alert('No items found! Please add items first.');
+                return;
+            }
+            
+            state.session.status = 'selecting';
+            saveSession();
+            showSelection();
+        }
+
+        function showSelection() {
+            showScreen('select');
+            renderItems();
+        }
+
+        function renderItems() {
+            const list = document.getElementById('itemsList');
+            list.innerHTML = '';
+            let mySub = 0;
+            let orphans = 0;
+            const numParticipants = state.session.participants.length || 1;
+
+            state.session.items.forEach(it => {
+                const selections = state.session.selections[it.id] || [];
+                const mySel = selections.find(s => s.userId === state.userId);
+                if (selections.length === 0) orphans++;
+
+                // BUG 11 FIX: Items split only among people who selected them
+                if (mySel) {
+                    if (mySel.type === 'solo') mySub += it.price;
+                    else mySub += it.price / selections.length;
+                }
+
+                const d = document.createElement('div');
+                d.className = 'item-card ' + (selections.length === 0 ? 'unclaimed' : '');
+                let claimants = selections.map(s => {
+                    const p = state.session.participants.find(x => x.id === s.userId);
+                    return `<span class="claimant-tag"><span>${p?.emoji || '?'}</span>${p?.name || 'User'}</span>`;
+                }).join('');
+
+                d.innerHTML = `
+                    <div class="flex justify-between mb-2">
+                        <div class="font-bold">${it.quantity > 1 ? it.quantity+'x ' : ''}${it.name}</div>
+                        <div class="text-green-400 font-bold">$${it.price.toFixed(2)}</div>
+                    </div>
+                    <div class="mb-3">${claimants}</div>
+                    <div class="flex gap-2">
+                        ${mySel ? `<button class="btn btn-outline flex-1 text-sm py-2" style="min-height: 44px; color: var(--error);" onclick="unclaim('${it.id}')">Remove</button>` : `
+                        <button class="btn btn-success flex-1 text-sm py-2" style="min-height: 44px;" onclick="claim('${it.id}', 'solo')">Solo</button>
+                        <button class="btn btn-primary flex-1 text-sm py-2" style="min-height: 44px;" onclick="claim('${it.id}', 'even')">Split</button>
+                        `}
+                    </div>
+                `;
+                list.appendChild(d);
+            });
+
+            // BUG 11 FIX: Tax and Tip split equally among ALL users
+            const myTaxShare = state.session.tax / numParticipants;
+            const myTipShare = state.session.tip / numParticipants;
+            const myTotal = mySub + myTaxShare + myTipShare;
+            
+            document.getElementById('runningTotal').textContent = '$' + myTotal.toFixed(2);
+            
+            document.getElementById('orphanAlert').classList.toggle('hidden', orphans === 0);
+            document.getElementById('orphanCount').textContent = orphans;
+            const progress = state.session.items.length > 0 ? ((state.session.items.length - orphans) / state.session.items.length) * 100 : 0;
+            document.getElementById('claimProgress').style.width = progress + '%';
+        }
+
+        function claim(id, type) {
+            if (!state.session.selections[id]) state.session.selections[id] = [];
+            if (type === 'solo') state.session.selections[id] = [];
+            state.session.selections[id].push({ userId: state.userId, type, timestamp: Date.now() });
+            // Save user-specific selections for independent total calculation (Bug 6 fix)
+            saveSession();
+            renderItems();
+        }
+
+        function unclaim(id) {
+            if (state.session.selections[id]) {
+                state.session.selections[id] = state.session.selections[id].filter(s => s.userId !== state.userId);
+                saveSession();
+                renderItems();
+            }
+        }
+
+        function reviewSplit() {
+            showScreen('review');
+            let mySub = 0;
+            const itemsList = document.getElementById('yourItems');
+            itemsList.innerHTML = '';
+            const numParticipants = state.session.participants.length || 1;
+
+            state.session.items.forEach(it => {
+                const selections = state.session.selections[it.id] || [];
+                const mySel = selections.find(s => s.userId === state.userId);
+                if (mySel) {
+                    // BUG 11 FIX: Items split only among people who selected them
+                    let amt = mySel.type === 'solo' ? it.price : it.price / selections.length;
+                    mySub += amt;
+                    itemsList.innerHTML += `<div class="flex justify-between text-sm"><span>${it.name}</span><span>$${amt.toFixed(2)}</span></div>`;
+                }
+            });
+
+            // BUG 11 FIX: Tax and Tip split equally among ALL users
+            const tax = state.session.tax / numParticipants;
+            const tip = state.session.tip / numParticipants;
+            
+            document.getElementById('yourSubtotal').textContent = '$' + mySub.toFixed(2);
+            document.getElementById('yourTax').textContent = '$' + tax.toFixed(2);
+            document.getElementById('yourTip').textContent = '$' + tip.toFixed(2);
+            document.getElementById('yourTotalDisplay').textContent = '$' + (mySub + tax + tip).toFixed(2);
+
+            // Show payment methods for non-hosts
+            const paySection = document.getElementById('payHostSection');
+            const paymentButtons = document.getElementById('paymentButtons');
+            
+            if (!state.isHost && state.session.paymentMethods) {
+                const pm = state.session.paymentMethods;
+                let buttonsHtml = '';
+                
+                if (pm.venmo) {
+                    const venmoUrl = pm.venmo.startsWith('http') ? pm.venmo : `https://venmo.com/${pm.venmo.replace('@', '')}`;
+                    buttonsHtml += `<a href="${venmoUrl}" target="_blank" class="btn btn-outline w-full" style="background: #008CFF; color: white; border: none;">[Pay] Pay with Venmo</a>`;
+                }
+                if (pm.cashapp) {
+                    const cashUrl = pm.cashapp.startsWith('http') ? pm.cashapp : `https://cash.app/${pm.cashapp}`;
+                    buttonsHtml += `<a href="${cashUrl}" target="_blank" class="btn btn-outline w-full" style="background: #00D632; color: white; border: none;">[Pay] Pay with Cash App</a>`;
+                }
+                if (pm.paypal) {
+                    buttonsHtml += `<a href="${pm.paypal}" target="_blank" class="btn btn-outline w-full" style="background: #0070BA; color: white; border: none;">[Pay] Pay with PayPal</a>`;
+                }
+                if (pm.applepay) {
+                    buttonsHtml += `<button class="btn btn-outline w-full" style="background: #000; color: white; border: none;" onclick="alert('Apple Pay: ${pm.applepay}')">[Pay] Pay with Apple Pay</button>`;
+                }
+                
+                if (buttonsHtml) {
+                    paymentButtons.innerHTML = buttonsHtml;
+                    paySection.style.display = 'block';
+                } else {
+                    paySection.style.display = 'none';
+                }
+            } else {
+                paySection.style.display = 'none';
+            }
+        }
+
+        function goToFinal() { state.session.status = 'final'; saveSession(); showScreen('final'); renderFinal(); }
+
+        function backToSelection() { showScreen('select'); renderItems(); }
+
+        function renderFinal() {
+            const list = document.getElementById('finalLeaderboard');
+            list.innerHTML = '';
+            const numParticipants = state.session.participants.length || 1;
+            
+            const totals = state.session.participants.map(p => {
+                let sub = 0;
+                state.session.items.forEach(it => {
+                    const sels = state.session.selections[it.id] || [];
+                    const s = sels.find(x => x.userId === p.id);
+                    // BUG 11 FIX: Items split only among people who selected them
+                    if (s) sub += (s.type === 'solo' ? it.price : it.price / sels.length);
+                });
+                // BUG 11 FIX: Tax and Tip split equally among ALL users
+                const taxShare = state.session.tax / numParticipants;
+                const tipShare = state.session.tip / numParticipants;
+                return { ...p, total: sub + taxShare + tipShare };
+            }).sort((a, b) => b.total - a.total);
+
+            totals.forEach((t, i) => {
+                list.innerHTML += `
+                    <div class="card flex items-center gap-4">
+                        <div class="text-2xl font-black text-purple-500 w-8">#${i+1}</div>
+                        <div class="avatar">${t.emoji}</div>
+                        <div class="flex-1 font-bold">${t.name}</div>
+                        <div class="text-xl font-black text-green-400">$${t.total.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+            
+            const totalBill = state.session.items.reduce((a, b) => a + b.price, 0) + state.session.tax + state.session.tip;
+            document.getElementById('billTotal').textContent = '$' + totalBill.toFixed(2);
+            document.getElementById('splitCountDisplay').textContent = state.session.participants.length + ' people';
+        }
+
+        function resetApp() { storage.clear(); location.reload(); }
+        function updateUI() {
+            // Check if we need to switch screens based on status
+            const currentScreen = document.querySelector('.screen.active');
+            const currentScreenId = currentScreen ? currentScreen.id : '';
+            
+            if (state.session.status === 'lobby' && currentScreenId !== 'lobbyScreen') {
+                showScreen('lobby');
+                renderPlayers();
+            } else if (state.session.status === 'selecting' && currentScreenId !== 'selectScreen') {
+                showScreen('select');
+                renderItems();
+            } else if (state.session.status === 'final' && currentScreenId !== 'finalScreen') {
+                showScreen('final');
+                renderFinal();
+            } else if (state.session.status === 'receipt' && currentScreenId !== 'receiptScreen') {
+                // Only host should see receipt screen
+                if (state.isHost) {
+                    showScreen('receipt');
+                }
+            } else {
+                // Same screen, just update content
+                if (state.session.status === 'lobby') renderPlayers();
+                else if (state.session.status === 'selecting') renderItems();
+                else if (state.session.status === 'final') renderFinal();
+            }
+        }
+    </script>
+</body>
+</html>
