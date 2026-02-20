@@ -17,7 +17,7 @@
             --surface-light: #1f1f1f;
             --border: #2a2a2a;
             --primary: #FF6B00;
-            --success: #22c55e;
+            --success: #EAB308;
             --warning: #facc15;
             --error: #dc2626;
             --text: #ffffff;
@@ -259,7 +259,7 @@
     <!-- Screen 3: Name/Avatar -->
     <div class="modal" id="nameModal">
         <div class="modal-content">
-            <button onclick="backToWelcome()" class="btn btn-ghost mb-4" style="padding: 8px 16px; background: transparent; border: none;"><span class="btn-face" style="background: transparent; box-shadow: none; color: var(--primary); font-size: 24px;">←</span></button>
+            <button onclick="backToWelcome()" class="back-arrow-btn mb-4" title="Back"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <h3 class="text-xl font-bold mb-4">Who are you?</h3>
             <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
             <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
