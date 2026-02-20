@@ -259,7 +259,7 @@
     <!-- Screen 3: Name/Avatar -->
     <div class="modal" id="nameModal">
         <div class="modal-content">
-            <button onclick="backToWelcome()" class="text-sm mb-4" style="color: var(--text-secondary); background: none; border: none; cursor: pointer;">[Back] Back</button>
+            <button onclick="backToWelcome()" class="btn btn-ghost mb-4" style="padding: 8px 16px; background: transparent; border: none;"><span class="btn-face" style="background: transparent; box-shadow: none; color: var(--primary); font-size: 24px;">←</span></button>
             <h3 class="text-xl font-bold mb-4">Who are you?</h3>
             <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
             <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
@@ -476,7 +476,7 @@ Total $48.15"></textarea>
 
             <div class="space-y-3">
                 <button class="btn btn-success w-full" onclick="goToFinal()">Looks Good [OK]</button>
-                <button class="btn btn-outline w-full" onclick="backToSelection()">[Back] Go Back & Edit</button>
+                <button class="btn btn-outline w-full" onclick="backToSelection()" style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="color: var(--primary); font-size: 20px;">←</span> Back & Edit</button>
             </div>
         </div>
     </div>
