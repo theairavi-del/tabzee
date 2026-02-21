@@ -98,8 +98,9 @@
             font-weight: 900;
             font-size: 1.75rem;
             letter-spacing: -1px;
-            color: var(--primary);
         }
+        .logo .tab { color: var(--primary); }
+        .logo .zee { color: #ffffff; }
         .logo span { color: #ffffff !important;
             color: var(--primary);
         }
@@ -216,7 +217,7 @@
 <body>
     <!-- Navigation -->
     <nav class="nav" id="nav" style="display: none;">
-        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen">TABZEE</div>
+        <div class="logo cursor-pointer" onclick="goHome()" title="Go to welcome screen"><span class="tab">TAB</span><span class="zee">ZEE</span></div>
         <div class="font-mono text-sm px-4 py-2 rounded-lg cursor-pointer" style="border: 2px solid var(--warning); color: var(--warning);" id="roomDisplay" onclick="shareRoomCode()" title="Tap to share or copy"></div>
     </nav>
 
@@ -224,7 +225,7 @@
     <div class="screen active" id="welcomeScreen">
         <!-- BUG 10 FIX: Logo always visible and clickable on welcome screen too -->
         <div class="absolute top-0 left-0 right-0 p-4 text-center">
-            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="TABZEE - Click to refresh">TABZEE</div>
+            <div class="logo cursor-pointer inline-block" onclick="goHome()" title="TABZEE - Click to refresh"><span class="tab">TAB</span><span class="zee">ZEE</span></div>
         </div>
         <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
             <div class="text-8xl mb-6 emoji-bounce" style="font-size: 5rem; color: var(--success);">$</div>
