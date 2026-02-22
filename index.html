@@ -106,6 +106,33 @@
         .logo .zee {
             color: #FF6B00;
         }
+
+        /* Letter Circles - 20 shades of orange/yellow */
+        .letter-circles {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--surface-light);
+            border-radius: 12px;
+        }
+        .letter-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: #000;
+            transition: all 0.2s ease;
+        }
+        .letter-circle.empty {
+            background: var(--surface) !important;
+            border: 2px dashed var(--border);
+        }
         
         /* Custom Confirmation Modal */
         .confirm-modal {
@@ -264,7 +291,8 @@
         <div class="modal-content">
             <button onclick="backToWelcome()" class="back-arrow-btn mb-4" title="Back"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <h3 class="text-xl font-bold mb-4">Who are you?</h3>
-            <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
+            <div class="letter-circles" id="letterCircles"></div>
+            <input type="text" class="input mb-4" id="userName" placeholder="Type your name..." maxlength="20">
             <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
             <button class="btn btn-primary w-full" onclick="setUser()">Continue</button>
         </div>
@@ -802,6 +830,31 @@ Total $48.15"></textarea>
         }
 
         const EMOJIS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
+
+        // 20 shades of orange/yellow for letter circles
+        const LETTER_COLORS = [
+            '#FF4500', // Orange Red
+            '#FF6B00', // Primary Orange
+            '#FF8C00', // Dark Orange
+            '#FFA500', // Orange
+            '#FFB347', // Pastel Orange
+            '#FFCC00', // Golden Yellow
+            '#FFD700', // Gold
+            '#FFE135', // Banana Yellow
+            '#FFEA00', // Yellow
+            '#FFF200', // Lemon Yellow
+            '#F4D03F', // Bright Yellow
+            '#F7DC6F', // Soft Yellow
+            '#F8C471', // Light Orange
+            '#E67E22', // Carrot Orange
+            '#D35400', // Pumpkin Orange
+            '#E74C3C', // Red Orange
+            '#F39C12', // Dark Yellow
+            '#F1C40F', // Vivid Yellow
+            '#E59866', // Sandy Orange
+            '#EDBB99', // Pale Orange
+        ];
+
         const parser = new ReceiptParser();
         
         // Storage wrapper with error handling and fallback
@@ -1255,8 +1308,15 @@ Total $48.15"></textarea>
             });
         }
 
-        function showNameModal() { document.getElementById('nameModal').classList.add('active'); }
-        
+        function showNameModal() {
+            document.getElementById('nameModal').classList.add('active');
+            initLetterCircles();
+            // Add input listener for letter circles
+            const nameInput = document.getElementById('userName');
+            nameInput.oninput = (e) => updateLetterCircles(e.target.value);
+            nameInput.focus();
+        }
+
         function backToWelcome() {
             // Reset state
             state.roomCode = null;
@@ -1300,6 +1360,41 @@ Total $48.15"></textarea>
                 grid.appendChild(d);
             });
             state.userEmoji = EMOJIS[0];
+        }
+
+        // Initialize letter circles grid (20 empty circles)
+        function initLetterCircles() {
+            const container = document.getElementById('letterCircles');
+            container.innerHTML = '';
+            for (let i = 0; i < 20; i++) {
+                const circle = document.createElement('div');
+                circle.className = 'letter-circle empty';
+                circle.id = `letter-circle-${i}`;
+                container.appendChild(circle);
+            }
+        }
+
+        // Get color for a letter (consistent hash)
+        function getLetterColor(char) {
+            const code = char.toUpperCase().charCodeAt(0);
+            return LETTER_COLORS[code % 20];
+        }
+
+        // Update letter circles based on input
+        function updateLetterCircles(name) {
+            for (let i = 0; i < 20; i++) {
+                const circle = document.getElementById(`letter-circle-${i}`);
+                if (i < name.length) {
+                    const char = name[i];
+                    circle.textContent = char.toUpperCase();
+                    circle.style.background = getLetterColor(char);
+                    circle.classList.remove('empty');
+                } else {
+                    circle.textContent = '';
+                    circle.style.background = '';
+                    circle.classList.add('empty');
+                }
+            }
         }
 
         function setUser() {
