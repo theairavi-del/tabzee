@@ -107,31 +107,27 @@
             color: #FF6B00;
         }
 
-        /* Letter Circles - 20 shades of orange/yellow */
-        .letter-circles {
+        /* Color Picker Grid - 20 shades of orange/yellow */
+        .color-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 8px;
+            gap: 10px;
             margin-bottom: 16px;
-            padding: 12px;
-            background: var(--surface-light);
-            border-radius: 12px;
         }
-        .letter-circle {
-            width: 40px;
-            height: 40px;
+        .color-option {
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 16px;
-            color: #000;
+            cursor: pointer;
             transition: all 0.2s ease;
+            border: 3px solid transparent;
         }
-        .letter-circle.empty {
-            background: var(--surface) !important;
-            border: 2px dashed var(--border);
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+        .color-option.selected {
+            border-color: #ffffff;
+            box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
         }
         
         /* Custom Confirmation Modal */
@@ -291,10 +287,10 @@
         <div class="modal-content">
             <button onclick="backToWelcome()" class="back-arrow-btn mb-4" title="Back"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <h3 class="text-xl font-bold mb-4">Who are you?</h3>
-            <div class="letter-circles" id="letterCircles"></div>
-            <input type="text" class="input mb-4" id="userName" placeholder="Type your name..." maxlength="20">
-            <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGrid"></div>
-            <button class="btn btn-primary w-full" onclick="setUser()">Continue</button>
+            <input type="text" class="input mb-4" id="userName" placeholder="Your name" maxlength="12">
+            <p class="text-sm mb-3" style="color: var(--text-secondary);">Pick your color:</p>
+            <div class="color-grid" id="colorGrid"></div>
+            <button class="btn btn-primary w-full mt-4" onclick="setUser()">Continue</button>
         </div>
     </div>
 
@@ -924,6 +920,7 @@ Total $48.15"></textarea>
             userId: null,
             userName: null,
             userEmoji: null,
+            userColor: '#FF6B00',
             isHost: false,
             session: {
                 participants: [],
@@ -1310,11 +1307,8 @@ Total $48.15"></textarea>
 
         function showNameModal() {
             document.getElementById('nameModal').classList.add('active');
-            initLetterCircles();
-            // Add input listener for letter circles
-            const nameInput = document.getElementById('userName');
-            nameInput.oninput = (e) => updateLetterCircles(e.target.value);
-            nameInput.focus();
+            initColorGrid();
+            document.getElementById('userName').focus();
         }
 
         function backToWelcome() {
@@ -1362,53 +1356,30 @@ Total $48.15"></textarea>
             state.userEmoji = EMOJIS[0];
         }
 
-        // Initialize letter circles grid (20 empty circles)
-        function initLetterCircles() {
-            const container = document.getElementById('letterCircles');
-            container.innerHTML = '';
-            for (let i = 0; i < 20; i++) {
-                const circle = document.createElement('div');
-                circle.className = 'letter-circle empty';
-                circle.id = `letter-circle-${i}`;
-                container.appendChild(circle);
-            }
-        }
-
-        // Get color for a letter (consistent hash)
-        function getLetterColor(char) {
-            const code = char.toUpperCase().charCodeAt(0);
-            return LETTER_COLORS[code % 20];
-        }
-
-        // Update letter circles based on input
-        function updateLetterCircles(name) {
-            for (let i = 0; i < 20; i++) {
-                const circle = document.getElementById(`letter-circle-${i}`);
-                if (i < name.length) {
-                    const char = name[i];
-                    circle.textContent = char.toUpperCase();
-                    circle.style.background = getLetterColor(char);
-                    circle.classList.remove('empty');
-                } else {
-                    circle.textContent = '';
-                    circle.style.background = '';
-                    circle.classList.add('empty');
-                }
-            }
+        // Initialize color picker grid (20 orange/yellow shades)
+        function initColorGrid() {
+            const grid = document.getElementById('colorGrid');
+            grid.innerHTML = '';
+            LETTER_COLORS.forEach((color, i) => {
+                const div = document.createElement('div');
+                div.className = 'color-option' + (i === 1 ? ' selected' : '');
+                div.style.background = color;
+                div.onclick = () => {
+                    document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
+                    div.classList.add('selected');
+                    state.userColor = color;
+                };
+                grid.appendChild(div);
+            });
+            state.userColor = LETTER_COLORS[1];
         }
 
         function setUser() {
             const name = document.getElementById('userName').value.trim();
             if (!name) return;
             state.userName = name;
-            
-            // BUG 16 FIX: Use first letter of name as avatar if no emoji selected
-            let avatar = state.userEmoji;
-            if (!avatar || avatar === '👤') {
-                avatar = name.charAt(0).toUpperCase();
-            }
-            
-            state.session.participants.push({ id: state.userId, name, emoji: avatar, isHost: state.isHost });
+
+            state.session.participants.push({ id: state.userId, name, color: state.userColor, isHost: state.isHost });
             document.getElementById('nameModal').classList.remove('active');
             document.getElementById('roomDisplay').textContent = state.roomCode;
             saveSession();
