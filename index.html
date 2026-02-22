@@ -237,6 +237,65 @@
         .avatar-remove:active {
             transform: scale(0.9);
         }
+
+        /* Item Remove Button - Aesthetic */
+        .item-remove {
+            width: 32px;
+            height: 32px;
+            background: rgba(220, 38, 38, 0.15);
+            border: 2px solid rgba(220, 38, 38, 0.3);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ff4444;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .item-remove:hover {
+            background: rgba(220, 38, 38, 0.3);
+            border-color: #ff4444;
+            transform: scale(1.05);
+        }
+        .item-remove:active {
+            transform: scale(0.95);
+            background: #dc2626;
+            color: white;
+        }
+
+        /* Swipeable Item Row */
+        .swipe-item {
+            position: relative;
+            overflow: hidden;
+            touch-action: pan-y;
+        }
+        .swipe-item .swipe-bg {
+            position: absolute;
+            inset: 0;
+            background: #dc2626;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 20px;
+            color: white;
+            font-weight: 600;
+            transform: translateX(100%);
+            transition: transform 0.2s ease;
+        }
+        .swipe-item .swipe-content {
+            position: relative;
+            background: var(--surface-light);
+            transition: transform 0.2s ease;
+            border-radius: 8px;
+        }
+        .swipe-item.swiped .swipe-content {
+            transform: translateX(-80px);
+        }
+        .swipe-item.swiped .swipe-bg {
+            transform: translateX(0);
+        }
     </style>
 </head>
 <body>
@@ -1831,15 +1890,24 @@ Total $48.15"></textarea>
                 div.className = 'flex justify-between items-center p-3 rounded-lg';
                 div.style.background = item.isTax || item.isTip ? 'rgba(139, 92, 246, 0.1)' : 'var(--surface-light)';
                 div.innerHTML = `
-                    <div>
-                        <div class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</div>
-                        ${item.isTax || item.isTip ? '<div class="text-xs text-purple-400">Auto-detected</div>' : ''}
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-green-400">$${item.price.toFixed(2)}</span>
-                        <button class="text-red-400" onclick="removeExtractedItem(${i})">[X]</button>
+                    <div class="swipe-item" id="swipe-item-${i}">
+                        <div class="swipe-bg" onclick="removeExtractedItem(${i})">
+                            <span>🗑 Delete</span>
+                        </div>
+                        <div class="swipe-content flex justify-between items-center p-3">
+                            <div>
+                                <div class="font-bold">${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}</div>
+                                ${item.isTax || item.isTip ? '<div class="text-xs text-purple-400">Auto-detected</div>' : ''}
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="font-bold text-green-400">$${item.price.toFixed(2)}</span>
+                                <button class="item-remove" onclick="removeExtractedItem(${i})" title="Remove item">×</button>
+                            </div>
+                        </div>
                     </div>
                 `;
+                // Add swipe gesture
+                addSwipeGesture(div.querySelector('.swipe-item'), i);
                 container.appendChild(div);
             });
             
@@ -1879,6 +1947,72 @@ Total $48.15"></textarea>
                 document.getElementById('scannedTip').textContent = '$' + tip.toFixed(2);
                 document.getElementById('scannedTotal').textContent = '$' + total.toFixed(2);
             }
+        }
+
+        // iOS-style swipe to delete
+        function addSwipeGesture(element, index) {
+            if (!element) return;
+            let startX = 0;
+            let currentX = 0;
+            let isSwiped = false;
+
+            element.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+            }, { passive: true });
+
+            element.addEventListener('touchmove', (e) => {
+                currentX = e.touches[0].clientX;
+                const diff = startX - currentX;
+                if (diff > 0 && diff < 100) {
+                    element.classList.add('swiped');
+                    isSwiped = true;
+                }
+            }, { passive: true });
+
+            element.addEventListener('touchend', () => {
+                const diff = startX - currentX;
+                if (diff < 30) {
+                    element.classList.remove('swiped');
+                    isSwiped = false;
+                }
+            });
+
+            // Mouse support for desktop
+            let isDragging = false;
+            element.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+            });
+
+            element.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                currentX = e.clientX;
+                const diff = startX - currentX;
+                if (diff > 30) {
+                    element.classList.add('swiped');
+                    isSwiped = true;
+                }
+            });
+
+            element.addEventListener('mouseup', () => {
+                isDragging = false;
+                if (!isSwiped) {
+                    element.classList.remove('swiped');
+                }
+            });
+
+            element.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+
+            // Click to close swipe
+            element.querySelector('.swipe-content').addEventListener('click', (e) => {
+                if (isSwiped) {
+                    e.preventDefault();
+                    element.classList.remove('swiped');
+                    isSwiped = false;
+                }
+            });
         }
 
         function showAddItemModal() {
